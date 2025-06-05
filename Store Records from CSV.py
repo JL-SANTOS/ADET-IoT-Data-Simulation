@@ -1,17 +1,36 @@
 import pandas as pd
-import datetime
 from web3 import Web3
+import time
 
-# Load CSV
+
+
 df = pd.read_csv("healthcare_data.csv")
 
-# Connect to Ganache
-web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:7545"))
-assert web3.is_connected(), "Ganache not connected"
-web3.eth.default_account = web3.eth.accounts[0]  # Owner account
+long_format_data = []
+for _, row in df.iterrows():
+    unix_ts = int(pd.to_datetime(row["timestamp"]).timestamp())
+    pid = row["patient_id"]
 
-# Load Contract
-contract_address = "0x77e1bC2CF79882a0f8CC1221381700f9d2984c0d"  # Replace this
+    long_format_data.extend([
+        {"timestamp": unix_ts, "patient_id": pid, "data_type": "heart_rate", "data_value": str(row["heart_rate"])},
+        {"timestamp": unix_ts, "patient_id": pid, "data_type": "blood_pressure", "data_value": str(row["blood_pressure"])},
+        {"timestamp": unix_ts, "patient_id": pid, "data_type": "oxygen_level", "data_value": str(row["oxygen_level"])},
+        {"timestamp": unix_ts, "patient_id": pid, "data_type": "body_temp", "data_value": str(row["body_temp"])},
+    ])
+
+df_long = pd.DataFrame(long_format_data)
+
+ganache_url = "http://127.0.0.1:7545"
+web3 = Web3(Web3.HTTPProvider(ganache_url))
+
+if web3.is_connected():
+    print("Connected to Ganache successfully!")
+else:
+    print("Connection failed. Ensure Ganache is running.")
+
+
+contract_address = "0x6ddaa7081cF17C0C2c8D7F52cD12d53D8C73EC3f"
+
 abi = [
 	{
 		"inputs": [],
@@ -30,35 +49,23 @@ abi = [
 			{
 				"indexed": False,
 				"internalType": "string",
-				"name": "patientId",
+				"name": "deviceId",
 				"type": "string"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "heartRate",
-				"type": "uint256"
 			},
 			{
 				"indexed": False,
 				"internalType": "string",
-				"name": "bloodPressure",
+				"name": "dataType",
 				"type": "string"
 			},
 			{
 				"indexed": False,
-				"internalType": "uint256",
-				"name": "oxygenLevel",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "bodyTemp",
-				"type": "uint256"
+				"internalType": "string",
+				"name": "dataValue",
+				"type": "string"
 			}
 		],
-		"name": "HealthDataStored",
+		"name": "DataStored",
 		"type": "event"
 	},
 	{
@@ -70,33 +77,57 @@ abi = [
 			},
 			{
 				"internalType": "string",
-				"name": "_patientId",
+				"name": "_deviceId",
 				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_heartRate",
-				"type": "uint256"
 			},
 			{
 				"internalType": "string",
-				"name": "_bloodPressure",
+				"name": "_dataType",
 				"type": "string"
 			},
 			{
-				"internalType": "uint256",
-				"name": "_oxygenLevel",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_bodyTemp",
-				"type": "uint256"
+				"internalType": "string",
+				"name": "_dataValue",
+				"type": "string"
 			}
 		],
 		"name": "storeData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "dataRecords",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "deviceId",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "dataType",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "dataValue",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -120,24 +151,14 @@ abi = [
 				"type": "string"
 			},
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
 				"internalType": "string",
 				"name": "",
 				"type": "string"
 			},
 			{
-				"internalType": "uint256",
+				"internalType": "string",
 				"name": "",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
+				"type": "string"
 			}
 		],
 		"stateMutability": "view",
@@ -150,50 +171,6 @@ abi = [
 			{
 				"internalType": "uint256",
 				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "healthRecords",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "timestamp",
-				"type": "uint256"
-			},
-			{
-				"internalType": "string",
-				"name": "patientId",
-				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "heartRate",
-				"type": "uint256"
-			},
-			{
-				"internalType": "string",
-				"name": "bloodPressure",
-				"type": "string"
-			},
-			{
-				"internalType": "uint256",
-				"name": "oxygenLevel",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "bodyTemp",
 				"type": "uint256"
 			}
 		],
@@ -226,36 +203,24 @@ abi = [
 		"stateMutability": "view",
 		"type": "function"
 	}
-]
+] 
 
 contract = web3.eth.contract(address=contract_address, abi=abi)
 
-# Function to convert float temp to int (36.5°C -> 365)
-def encode_temp(temp):
-    return int(float(temp) * 10)
+web3.eth.default_account = web3.eth.accounts[0]
 
-# Convert timestamp string to UNIX integer (if it's in datetime format)
-def parse_csv_timestamp(ts):
-    return int(pd.to_datetime(ts).timestamp())
 
-# Updated function to send data
-def store_health_data(row):
-    timestamp = parse_csv_timestamp(row["timestamp"])
-    
-    txn = contract.functions.storeData(
-        timestamp,
-        str(row["patient_id"]),
-        int(row["heart_rate"]),
-        str(row["blood_pressure"]),
-        int(row["oxygen_level"]),
-        encode_temp(row["body_temp"])
-    ).transact({'from': web3.eth.default_account})
-    
+
+def send_iot_data(timestamp, patient_id, data_type, data_value):
+    txn = contract.functions.storeData(timestamp, patient_id, data_type, data_value).transact({
+        'from': web3.eth.default_account,
+        'gas': 3000000
+    })
     receipt = web3.eth.wait_for_transaction_receipt(txn)
-    print(f"Stored {row['patient_id']} @ {timestamp} | Tx: {receipt.transactionHash.hex()}")
+    print(f"✅ Sent {data_type} = {data_value} for {patient_id} at {timestamp} | Txn: {receipt.transactionHash.hex()}")
 
 
-# Loop through CSV rows and send data
-for _, row in df.iterrows():
-    store_health_data(row)
-    time.sleep(1)  # optional, avoid flooding
+for _, row in df_long.iterrows():
+    send_iot_data(row["timestamp"], row["patient_id"], row["data_type"], row["data_value"])
+    time.sleep(1)
+
